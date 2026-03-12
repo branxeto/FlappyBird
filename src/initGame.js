@@ -1,6 +1,7 @@
 import initKaplay from "./kaplayCtx"
 
-const GRAVITY = 2500
+const GRAVITY = 2000
+const JUMP = 500
 const MIN = 412
 const MAX = 50
 const OPEN = 130
@@ -23,6 +24,7 @@ export default function initGame() {
     })
     k.loadSprite("pipes", "./pipe-green.png")
     k.loadSprite("lose-game", "./gameover.png")
+    k.loadSprite("numbers", ["./numbers/0.png", "./numbers/1.png", "./numbers/2.png", "./numbers/3.png", "./numbers/4.png", "./numbers/5.png", "./numbers/6.png", "./numbers/7.png", "./numbers/8.png", "./numbers/9.png"])
 
     // Init game
     k.scene("start-game", () => {
@@ -37,17 +39,18 @@ export default function initGame() {
             k.pos(k.center()),
             k.anchor("center")
         ])
-        k.onMousePress("left", () => k.go("game"))
+        k.onMousePress("left", () => k.go("game", 0))
     })
     k.go("start-game")
 
     // Game
-    k.scene("game", () => {
+    k.scene("game", (score) => {
         // Background
         k.add([
             k.sprite("background-day"), 
             k.z(0),
-            k.pos(0,0)
+            k.pos(0,0),
+            "bg"
         ])
 
         // Floor
@@ -60,7 +63,35 @@ export default function initGame() {
             k.animate(),
             "floor"
         ])
-        floor.animate("pos", [k.vec2(0, BASE), k.vec2(-48, BASE)], {duration:1, direction:"forward"})
+        floor.animate("pos", [k.vec2(0, BASE), k.vec2(-48, BASE)], {duration:0.3, direction:"forward"})
+
+        // Score
+        const boxScore = k.add([
+            k.pos(k.width() / 2, 50),
+            k.z(2),
+            k.fixed()
+        ]);
+        const thentDigit = boxScore.add([
+            k.sprite("numbers", {frame: 0}),
+            k.pos(-10,0),
+            k.opacity(0)
+        ])
+        const unitDigit = boxScore.add([
+            k.sprite("numbers", {frame: 0}),
+            k.pos(10,0),
+            k.opacity(1)
+        ])
+        function Score(score) {
+            var thent = Math.floor(score / 10)
+            var unit = Math.floor(score % 10)
+            if (score > 9) {
+                thentDigit.opacity = 1
+                thentDigit.frame = thent
+
+            } 
+            unitDigit.frame = unit
+        }
+        k.onUpdate("bird", () => Score(score))
 
         // Bird
         const bird = k.add([
@@ -73,13 +104,13 @@ export default function initGame() {
             "bird"
         ])
         k.onMousePress("left", () => {
-            bird.jump(600)
+            bird.jump(JUMP)
         })
         bird.onCollide("pipe", () => {
-            k.go("lose")
+            k.go("lose", score)
         })
         bird.onCollide("floor", () => {
-            k.go("lose")
+            k.go("lose", score)
         })
 
         // Pipes
@@ -88,18 +119,19 @@ export default function initGame() {
 
         k.add([
             k.sprite("pipes"),
-            k.area(),
+            k.area({isSensor: true}),
             k.anchor("topright"),
             k.rotate(180),
             k.move(k.LEFT, 160),
             k.z(1),
             k.pos(k.width(), top),
             k.offscreen({destroy: true}),
-            "pipe"
+            "pipe",
+            {passed: false}
         ])
         k.add([
             k.sprite("pipes"),
-            k.area(),
+            k.area({isSensor: true}),
             k.rotate(0),
             k.move(k.LEFT, 160),
             k.z(1),
@@ -109,15 +141,48 @@ export default function initGame() {
             { passed: false },
             ])
         }
+        k.onUpdate("pipe", (p) => {
+            if (p.pos.x + p.width <= bird.pos.x && p.passed === false) {
+                score += 0.5
+                p.passed = true
+                k.debug.log(score)
+            }
+        })
 
         k.loop(1.2, () => {
             spawnPipe()
-            k.debug.log("pipe spawn")
         })
     })
 
     // Lost Game
-    k.scene("lose", () => {
+    k.scene("lose", (score) => {
+        var thent = Math.floor(score / 10)
+        var unit = Math.floor(score % 10)
+        const boxScore = k.add([
+            k.pos(k.width()/2, k.height()/2 + 50),
+            k.z(2),
+            k.fixed(),
+            k.anchor(k.center())
+        ]);
+        const thentDigit = boxScore.add([
+            k.sprite("numbers", {frame: 0}),
+            k.pos(-10,0),
+            k.opacity(0)
+        ])
+        const unitDigit = boxScore.add([
+            k.sprite("numbers", {frame: 0}),
+            k.pos(10,0),
+            k.opacity(1)
+        ])
+        if (score > 9) {
+            thentDigit.opacity = 1
+            thentDigit.frame = thent
+            unitDigit.frame = unit
+        } else {
+            unitDigit.frame = unit
+            unitDigit.pos = k.vec2(0,0)
+        }
+    
         k.add([
             k.sprite("background-day"), 
             k.z(0),
@@ -129,6 +194,6 @@ export default function initGame() {
             k.pos(k.width() / 2, k.height() / 2),
             k.anchor("center"),
         ]);
-        k.onMousePress("left", () => k.go("game"))
+        k.onMousePress("left", () => k.go("game", 0))
     })
 }
